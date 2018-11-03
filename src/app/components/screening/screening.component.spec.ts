@@ -1,18 +1,32 @@
 import { async, ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { ScreeningComponent } from './screening.component';
-import { RouterOutlet, ChildrenOutletContexts } from '@angular/router';
+//import { SkillTypeBuckets } from ''
+
+import { SkillTypeBucketsComponent } from '../skillType-buckets/skillType-buckets.component';
+import { FormsModule } from '@angular/forms';
+import { RouterTestingModule } from '@angular/router/testing';
+import { HttpClient, HttpHandler } from '@angular/common/http';
+import { UrlService } from '../../services/urls/url.service';
+import { Router, RouterModule } from '@angular/router';
+import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { RouteService } from '../../services/routes/route.service';
+
+
+
 
 // Author: David Gustafson
 
 describe('ScreeningComponent', () => {
+  const routerSpy = jasmine.createSpyObj('Router', ['navigate']);
   let component: ScreeningComponent;
   let fixture: ComponentFixture<ScreeningComponent>;
 
   beforeEach(async(() => {
     TestBed.configureTestingModule({
-      declarations: [ ScreeningComponent, RouterOutlet ],
-      providers: [ ChildrenOutletContexts ]
+      declarations: [ ScreeningComponent, SkillTypeBucketsComponent ],
+      imports: [FormsModule, RouterTestingModule, HttpClientTestingModule, RouterModule],
+      providers: [ HttpClient, HttpHandler, UrlService, RouteService]
     })
     .compileComponents();
   }));

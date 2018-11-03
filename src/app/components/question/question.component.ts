@@ -7,7 +7,8 @@ import { QuestionsService } from '../../services/questions/questions.service';
 import { trigger, state, style, transition, animate, keyframes } from '@angular/animations';
 import { BucketsService } from '../../services/buckets/buckets.service';
 import { AlertsService } from '../../services/alert-service/alerts.service';
-
+import { CandidatesScreeningListComponent } from '../candidates-screening-list/candidates-screening-list.component';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-question',
@@ -43,7 +44,8 @@ export class QuestionComponent implements OnInit {
   constructor(private modalService: NgbModal, private fb: FormBuilder,
     private questionService: QuestionsService,
     private bucketService: BucketsService,
-    private alertsService: AlertsService) { }
+    private alertsService: AlertsService,
+    private router: Router) { }
 
   createQuestion: FormGroup;
   newQuestion: Question;
@@ -58,6 +60,7 @@ export class QuestionComponent implements OnInit {
 
   ngOnInit() {
     this.currentBucket = this.bucketService.getCurrentBucket();
+    if(!this.currentBucket) {this.goToBuckets();}
     this.question = new Question();
     this.sampleAnswers = [this.question.sampleAnswer1,this.question.sampleAnswer2,this.question.sampleAnswer3,this.question.sampleAnswer4,this.question.sampleAnswer5];
     this.updateQuestions();
@@ -80,6 +83,38 @@ export class QuestionComponent implements OnInit {
     });
   }
 
+  goToBuckets() {
+    this.router.navigate(['settings/main']);
+  }
+
+  /** used to compare buckets Array to sort it based on status */
+  customSort(questions: Question[]): Question[] {
+    questions.sort(this.compare);
+    let active: Question[];
+    let inactive: Question[];
+    const index = questions.indexOf(questions.find(question=>question.isActive===false));
+    active=questions.slice(0,index).sort(this.alphabetize);
+    inactive=questions.slice(index).sort(this.alphabetize);
+    questions= index!==-1 ? active.concat(inactive) : questions.sort(this.alphabetize);
+    return questions;    
+  }
+
+  compare(a: Question, b: Question) {
+    if(a.isActive) {
+      return -1;
+    } else {
+      return 1;
+    }
+  }
+
+  alphabetize(a: Question, b: Question) {
+    if(a.questionText.toUpperCase()<b.questionText.toUpperCase()) {
+      return -1;
+    } else {
+      return 1;
+    }
+  }
+
   /**
    * A currently unused function that will give the reason for a modal closing
    * May be used later for giving different results based on how a modal is closed
@@ -99,13 +134,10 @@ export class QuestionComponent implements OnInit {
    * or from deactive to active based on its current status
    **/
   changeQuestionStatus(question) {
-    if (question.isActive) {
-      question.isActive = false;
-      this.questionService.deactivateQuestion(question.questionId).subscribe();
-   } else {
-      question.isActive = true;
-      this.questionService.activateQuestion(question.questionId).subscribe();
-   }
+    this.questionService.updateQuestion(question)
+    .subscribe(
+      () => this.updateQuestions()
+    );
   }
 
   /**
@@ -136,24 +168,21 @@ export class QuestionComponent implements OnInit {
    **/
   addNewQuestion() {
     if (this.sampleAnswers.length === 5 && this.question.questionText) {
+      this.question.sampleAnswer1 = this.sampleAnswers[0];
+      this.question.sampleAnswer2 = this.sampleAnswers[1];
+      this.question.sampleAnswer3 = this.sampleAnswers[2];
+      this.question.sampleAnswer4 = this.sampleAnswers[3];
+      this.question.sampleAnswer5 = this.sampleAnswers[4];
+
       if (this.question.questionId) {
-        this.question.sampleAnswer1 = this.sampleAnswers[0];
-        this.question.sampleAnswer2 = this.sampleAnswers[1];
-        this.question.sampleAnswer3 = this.sampleAnswers[2];
-        this.question.sampleAnswer4 = this.sampleAnswers[3];
-        this.question.sampleAnswer5 = this.sampleAnswers[4];
-        this.questionService.updateQuestion(this.question).subscribe();
+        this.questionService.updateQuestion(this.question).subscribe(() => this.updateQuestions());
         this.updatedSuccessfully();
       } else {
-        this.question.sampleAnswer1 = this.sampleAnswers[0];
-        this.question.sampleAnswer2 = this.sampleAnswers[1];
-        this.question.sampleAnswer3 = this.sampleAnswers[2];
-        this.question.sampleAnswer4 = this.sampleAnswers[3];
-        this.question.sampleAnswer5 = this.sampleAnswers[4];
-        this.questionService.createNewQuestion(this.question).subscribe();
+        this.question.isActive = true;
+        this.question.bucket = this.currentBucket;
+        this.questionService.createNewQuestion(this.question).subscribe(() => this.updateQuestions());
         this.savedSuccessfully();
       }
-      this.updateQuestions();
       this.setQuestionNull();
       this.sampleAnswers = [];
     } else {
@@ -167,9 +196,20 @@ export class QuestionComponent implements OnInit {
    **/
   updateQuestions() {
     if (this.currentBucket) {
-      this.questionService.getBucketQuestions(this.currentBucket.bucketId).subscribe(data => {
-        this.questions = (data as Question[]);
+      this.questionService.getBucketQuestions(this.currentBucket.bucketId)
+      .subscribe(
+        data => {
+        this.questions = this.customSort(data);
       });
+    }
+  }
+
+  deleteQuestion() {
+    if(this.question) {
+      this.questionService.deleteQuestion(this.question.questionId)
+      .subscribe(bucket=>{
+        this.updateQuestions();
+      })
     }
   }
 
@@ -182,4 +222,7 @@ export class QuestionComponent implements OnInit {
   savedUnsuccessfull() {
     this.alertsService.error('All Fields Must be Filled');
   }
+
+
+
 }

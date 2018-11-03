@@ -8,12 +8,13 @@ import { QuestionsService } from '../../services/questions/questions.service';
 import { BucketFilterPipe } from '../../pipes/skillType-buckets.filter';
 import { NgbModal, ModalDismissReasons } from '@ng-bootstrap/ng-bootstrap';
 import { AlertsService } from '../../services/alert-service/alerts.service';
-
+import {ViewChild, ElementRef} from '@angular/core';
 
 @Component({
   selector: 'app-skill-type-buckets',
   templateUrl: './skillType-buckets.component.html',
-  styleUrls: ['./skillType-buckets.component.css']
+  styleUrls: ['./skillType-buckets.component.css'],
+  providers: [BucketFilterPipe]
 })
 
 export class SkillTypeBucketsComponent implements OnInit {
@@ -27,13 +28,19 @@ export class SkillTypeBucketsComponent implements OnInit {
 
   /** Modal variables */
   closeResult: string;
+  dismissResult: string;
+
+  bucketFilter: BucketFilterPipe;
+
+  @ViewChild('create') createModalRef: ElementRef;
 
   constructor(
     private router: Router,
     private bucketService: BucketsService,
     private questionService: QuestionsService,
     private modalService: NgbModal,
-    private alertsService: AlertsService, ) { }
+    private alertsService: AlertsService
+    ) { }
 
   filter: Bucket = new Bucket();
   ngOnInit() {
@@ -42,19 +49,37 @@ export class SkillTypeBucketsComponent implements OnInit {
 
   getBuckets(): void {
     this.bucketService.getAllBuckets().subscribe(buckets => {
-      this.buckets = buckets;
-      this.buckets.sort(this.compare);
+      this.buckets = this.customSort(buckets);
     });
   }
 
-  /** used to compare buckets Array to sort it based on status */
-  compare(a: Bucket, b: Bucket) {
-    if (a.isActive) {
+  customSort(buckets: Bucket[]): Bucket[] {
+    buckets.sort(this.compare);
+    let active: Bucket[];
+    let inactive: Bucket[];
+    const index = buckets.indexOf(buckets.find(bucket=>bucket.isActive===false));
+    active=buckets.slice(0,index).sort(this.alphabetize);
+    inactive=buckets.slice(index).sort(this.alphabetize);
+    buckets= index!==-1 ? active.concat(inactive) : buckets.sort(this.alphabetize);
+    return buckets;
+  }
+
+  alphabetize(a:Bucket, b: Bucket) {
+    if(a.bucketDescription.toUpperCase()<b.bucketDescription.toUpperCase()) {
       return -1;
     } else {
       return 1;
     }
   }
+
+  compare(a: Bucket, b: Bucket) {
+    if(a.isActive) {
+      return -1;
+    } else {
+      return 1;
+    }
+  }
+
 
   /** Save the selected 'bucket' in 'bucket.service' to be used in
     * 'bucket.component'.
@@ -70,6 +95,15 @@ export class SkillTypeBucketsComponent implements OnInit {
     this.currBucket = bucket;
   }
 
+  deleteBucket() {
+    if(this.currBucket) {
+      this.bucketService.deleteBucket(this.currBucket.bucketId)
+      .subscribe(bucket => {
+        this.getBuckets();
+      });
+    }
+  }
+
   /**
    * resposible for making call for updating a bucket
    * when edited or activity toggled
@@ -78,7 +112,6 @@ export class SkillTypeBucketsComponent implements OnInit {
   updateBucket(bucketParam: Bucket) {
     if (!bucketParam) { bucketParam = this.currBucket; }
     if (bucketParam) {
-      console.log(bucketParam.isActive);
       this.bucketService.updateBucket(bucketParam).subscribe(bucket => {
         this.getBuckets();
       });
@@ -92,6 +125,7 @@ export class SkillTypeBucketsComponent implements OnInit {
     this.bucketService.createNewBucket(this.newBucket)
       .subscribe(bucket => {
         this.buckets.push(bucket);
+        this.getBuckets();
       });
   }
 
@@ -105,9 +139,9 @@ export class SkillTypeBucketsComponent implements OnInit {
       this.closeResult = `Closed with: ${result}`;
     }, (reason) => {
       this.newBucket.bucketDescription = '';
-      this.closeResult = `Dismissed ${this.getDismissReason(reason)}`;
+      this.dismissResult = `Dismissed ${this.getDismissReason(reason)}`;
     });
-    event.stopPropagation();
+    //event.stopPropagation();
   }
 
   private getDismissReason(reason: any): string {
